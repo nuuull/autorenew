@@ -1,0 +1,76 @@
+name: AutoRenew
+
+on: 
+  release:
+    types: [published]
+  push:
+    tags:
+    - 'v*'
+  schedule:
+    - cron: "10 */2 * * *"
+  watch:
+    types: [started]
+   
+jobs:
+  refresh_token:
+    strategy:
+      fail-fast: false
+      matrix:
+        e5_accounts: ${{ fromJSON(vars.E5_ACCOUNTS) }}
+    runs-on: ubuntu-latest
+    if: (github.event.repository.owner.id == github.event.sender.id) || ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}  
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        persist-credentials: true 
+        fetch-depth: 0 
+    - name: Set up Python 
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.9
+        check-latest: true
+    - name: Install requests 
+      run: |
+        pip install requests
+    - name: Read config from secrets  
+      env: 
+        CREDS_E5: ${{ toJSON(secrets) }} 
+        NAME: ${{  matrix.e5_accounts }}
+      run: | 
+        cp main.py temp.py
+        jq -r ".CREDS_${NAME^^}" <<< "$CREDS_E5" > creds.txt
+        sed -i '10 r creds.txt' temp.py
+    - name: Test Api 
+      id: test-api
+      run: | 
+        python3 temp.py
+    - name: Delete secrets config 
+      run: | 
+        rm -f temp.py
+        rm -f creds.txt
+        rm -f Secret.txt
+    
+  logger:
+    runs-on: ubuntu-latest
+    name: Notify
+    if: ${{ always() }}
+    needs: refresh_token
+    steps:
+    - name: Get results
+      id: get-results
+      run: |
+        echo "::set-output name=results::$(curl -L \
+        -H "Accept: application/vnd.github+json" \
+        -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" | \
+        jq '[ .jobs[0:-1][] | "\(if .conclusion == "success" then "☑️" else "❎" end) \(.name[15:-1])" ] |  join("\n")')"
+    - name: Log results
+      env:
+        RESULTS: ${{ steps.get-results.outputs.results }}
+        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+      run: |
+        curl -X PATCH -H "Content-Type: application/json" \
+        -d "{\"username\": \"E5 Refresh Results\", \"content\": \"${RESULTS:1:-1}\n\nLast Run: <t:`date "+%s"`>\"}" \
+        $DISCORD_WEBHOOK 1> /dev/null 
