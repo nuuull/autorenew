@@ -72,5 +72,5 @@ jobs:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
       run: |
         curl -X PATCH -H "Content-Type: application/json" \
-        -d "{\"username\": \"E5 Refresh Results\", \"content\": \"${RESULTS:1:-1}\n\nLast Run: <t:`date "+%s"`>\"}" \
+        -d "{\"username\": \"E5 Refresh Results\", \"content\": \"${RESULTS:1:-1}\n\nLast Run: <t:`date "+%s"`:R>\"}" \
         $DISCORD_WEBHOOK 1> /dev/null 
