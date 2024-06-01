@@ -1,4 +1,4 @@
-name: AutoRenew #
+name: AutoRenew
 
 on: 
   release:
@@ -57,20 +57,18 @@ jobs:
     if: ${{ always() }}
     needs: refresh_token
     steps:
-    - name: Get results
-      id: get-results
-      run: |
-        echo "::set-output name=results::$(curl -L \
-        -H "Accept: application/vnd.github+json" \
-        -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-        -H "X-GitHub-Api-Version: 2022-11-28" \
-        "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" | \
-        jq '[ .jobs[0:-1][] | "\(if .conclusion == "success" then "☑️" else "❎" end) \(.name[15:-1])" ] |  join("\n")')"
+    - uses: actions/checkout@v3
     - name: Log results
       env:
-        RESULTS: ${{ steps.get-results.outputs.results }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-      run: |
-        curl -X PATCH -H "Content-Type: application/json" \
-        -d "{\"username\": \"E5 Refresh Results\", \"content\": \"${RESULTS:1:-1}\n\nLast Run: <t:`date "+%s"`:R>\"}" \
-        $DISCORD_WEBHOOK 1> /dev/null 
+      run: bash discord_webhook.sh
+
+  keepalive:
+    name: keepalive
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gautamkrishnar/keepalive-workflow@v2
