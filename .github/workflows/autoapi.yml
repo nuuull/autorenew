@@ -65,7 +65,7 @@ jobs:
       run: bash discord_webhook.sh
 
   keepalive:
-    name: keepalive
+    name: Keepalive
     runs-on: ubuntu-latest
     permissions:
       actions: write
